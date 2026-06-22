@@ -4,7 +4,7 @@ from chemprop import data, featurizers, models
 
 MODEL = None
 FEATURIZER = featurizers.SimpleMoleculeMolGraphFeaturizer()
-CKPT_PATH = "nlrp3-model/nlrp3_chemprop.ckpt"
+CKPT_PATH = "src/model/nlrp3-model/nlrp3_chemprop.ckpt"
 
 
 def load_model():
@@ -27,7 +27,7 @@ def predict_pic50(smiles):
         return None
 
     dset = data.MoleculeDataset([dp], FEATURIZER)
-    loader = data.build_dataloader(dset, shuffle=False)
+    loader = data.build_dataloader(dset, shuffle=False, batch_size=1, drop_last=False)
 
     with torch.no_grad():
         for batch in loader:
