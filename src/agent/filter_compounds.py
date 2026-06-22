@@ -1,5 +1,6 @@
 import requests
 import pandas as pd
+from src.model.chemprop_model import predict_pic50 
 
 def get_data():
     query_params = {
@@ -39,5 +40,13 @@ def get_data():
 
     return chembl_data[:MAX_COMPOUNDS]
 
-data = get_data()
-print(len(data))
+def filter_compounds():
+    data = get_data()
+    filtered_compounds = []
+    
+    for smiles in data: 
+        score = predict_pic50(smiles)
+        if score >= 6: 
+            filtered_compounds.append(smiles)
+    
+    return filtered_compounds 

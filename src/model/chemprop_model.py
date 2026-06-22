@@ -1,11 +1,11 @@
 import torch
 import numpy as np
 from chemprop import data, featurizers, models
+import os
 
+CKPT_PATH = os.path.join(os.path.dirname(__file__), "nlrp3-model", "nlrp3_chemprop.ckpt")
 MODEL = None
 FEATURIZER = featurizers.SimpleMoleculeMolGraphFeaturizer()
-CKPT_PATH = "src/model/nlrp3-model/nlrp3_chemprop.ckpt"
-
 
 def load_model():
     global MODEL
@@ -13,7 +13,6 @@ def load_model():
         MODEL = models.MPNN.load_from_checkpoint(CKPT_PATH)
         MODEL.eval()
     return MODEL
-
 
 def predict_pic50(smiles):
     model = load_model()
