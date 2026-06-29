@@ -2,7 +2,6 @@ from pdbfixer import PDBFixer
 from openmm.app import PDBFile
 from rdkit import Chem
 
-
 def parse_pdb_file():
     with open("data/9GU4.cif", "r") as f:
         fixer = PDBFixer(pdbxfile=f)
