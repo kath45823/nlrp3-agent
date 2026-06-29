@@ -3,6 +3,8 @@ from rdkit import Chem
 from rdkit.Chem import rdDistGeom
 from meeko import MoleculePreparation
 from meeko import PDBQTWriterLegacy
+from vina import Vina
+from src.data_processing.parse_pdb import get_coords
 
 def prepare_ligand():
     compounds = filter_compounds()
@@ -29,6 +31,19 @@ def prepare_ligand():
         else:
             print(f"PDBQT write failed: {error_msg}")
     
-    print(pdbqt_str_list)
+    return pdbqt_str_list
 
-prepare_ligand()
+def get_docking_score():
+    pdbqt_str_list = prepare_ligand()
+    pdbqt_str = pdbqt_str_list[0]
+    v = Vina(sf_name = 'vina')
+    coords = get_coords()
+
+    v.set_receptor('data/9GU4-receptor.pdbqt')
+    v.set_ligand_from_string(pdbqt_str)
+    v.compute_vina_maps(center=[coords[0], coords[1], coords[2]], box_size=[20, 20, 20])
+    v.dock(exhaustiveness=8, n_poses=3)
+
+    print(v.energies()[0][0])
+
+get_docking_score()
