@@ -11,6 +11,10 @@ def prepare_ligand(smi):
     if mol is None: 
         return None
 
+    frags = Chem.GetMolFrags(mol, asMols=True)
+    if len(frags) > 1:
+        mol = max(frags, key=lambda m: m.GetNumAtoms())
+
     mol_h = Chem.AddHs(mol)
     params = rdDistGeom.ETKDG()
     status = rdDistGeom.EmbedMolecule(mol_h, params)
