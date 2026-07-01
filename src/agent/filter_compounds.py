@@ -1,7 +1,8 @@
 import requests
 from src.model.chemprop_model import predict_pic50 
+from urllib.parse import quote
 
-def get_data():
+def fetch_compounds():
     query_params = {
         "format": "json",
         "limit": 1000,
@@ -39,8 +40,47 @@ def get_data():
 
     return chembl_data[:MAX_COMPOUNDS]
 
+def fetch_similar_compounds(ref_smi):
+    ref_smi_url = quote(ref_smi, safe = '')
+    query_params = {
+        "format": "json",
+        "limit": 1000,
+        "molecule_properties__num_ro5_violations": 0,
+        "molecule_type": "Small molecule",
+    }
+
+    chembl_data = []
+    offset = 0
+    MAX_COMPOUNDS = 2000
+
+    while len(chembl_data) < MAX_COMPOUNDS:
+        query_params["offset"] = offset
+        response = requests.get(
+             f"https://www.ebi.ac.uk/chembl/api/data/similarity/{ref_smi_url}/70", params=query_params
+        )
+        data = response.json()
+        total = data["page_meta"]["total_count"]
+
+        for m in data["molecules"]:
+            struct = m["molecule_structures"]
+            if not struct: 
+                continue
+
+            smiles = struct["canonical_smiles"]
+
+            if smiles is None:
+                continue
+
+            chembl_data.append(smiles)
+
+        offset += 1000
+        if offset >= total:
+            break
+
+    return chembl_data[:MAX_COMPOUNDS]
+
 def filter_compounds():
-    data = get_data()
+    data = fetch_compounds()
     filtered_compounds = []
     
     for smiles in data: 
