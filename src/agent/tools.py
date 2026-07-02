@@ -3,7 +3,14 @@ from urllib.parse import quote
 from vina import Vina
 from src.data_processing.parse_pdb import get_coords
 from src.agent.docking import prepare_ligand
+from src.model.chemprop_model import load_model
+import torch
+from chemprop import data, featurizers, models
+import os
 
+CKPT_PATH = os.path.join(os.path.dirname(__file__), "nlrp3-model", "nlrp3_chemprop.ckpt")
+MODEL = None
+FEATURIZER = featurizers.SimpleMoleculeMolGraphFeaturizer()
 COORDS = get_coords()
 
 def fetch_compounds():
@@ -95,3 +102,23 @@ def dock_compound(smi):
     v.dock(exhaustiveness=8, n_poses=3)
 
     return v.energies()[0][0]
+
+def predict_pic50(smi):
+    model = load_model()
+
+    try:
+        dp = data.MoleculeDatapoint.from_smi(smi, [0.0])
+    except Exception:
+        return None
+    
+    if dp.mol is None:
+        return None
+
+    dset = data.MoleculeDataset([dp], FEATURIZER)
+    loader = data.build_dataloader(dset, shuffle=False, batch_size=1, drop_last=False)
+
+    with torch.no_grad():
+        for batch in loader:
+            bmg, V_d, X_d, *_ = batch
+            pred = model(bmg, V_d, X_d)
+            return float(pred.numpy().flatten()[0])

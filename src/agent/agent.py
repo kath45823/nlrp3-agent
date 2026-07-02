@@ -1,6 +1,6 @@
 from openai import OpenAI
 import json
-from src.agent.tools import fetch_compounds, fetch_similar_compounds, dock_compound
+from src.agent.tools import fetch_compounds, fetch_similar_compounds, dock_compound, predict_pic50
 
 tools = [
     {
@@ -69,8 +69,32 @@ tools = [
                 "required": ["smi"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "predict_pic50",
+            "description": (
+                "Cheaply predict the NLRP3 binding activity (pIC50) of a compound from its SMILES "
+                "using a trained model. Fast and inexpensive compared to docking. Higher pIC50 means "
+                "predicted stronger activity; 6.0 or above suggests a promising compound worth docking. "
+                "Use this to pre-screen compounds before spending expensive docking calls on them."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "smi": {
+                        "type": "string", 
+                        "description": "SMILES string of the compound to predict activity for."
+                    }
+                },
+                "required": ["smi"]
+            }
+        }
     }
 ]
+
+SYSTEM_PROMPT = ""
 
 client = OpenAI()
 messages = [
@@ -103,6 +127,9 @@ while True:
         elif name == "dock_compound":
             score = dock_compound(args["smi"])
             result = score if score is not None else "docking failed - compound could not be prepared"
+        elif name == "predict_pic50":
+            score = predict_pic50(args["smi"])
+            result = score if score is not None else "pic50 prediction failed - compound could not be predicted"
         
         tool_message = {
             "tool_call_id": call.id, 
