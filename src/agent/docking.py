@@ -1,10 +1,9 @@
 from src.agent.filter_compounds import filter_compounds
-from src.data_processing.parse_pdb import get_coords
+from src.agent.tools import dock_compound
 from rdkit import Chem
 from rdkit.Chem import rdDistGeom
 from meeko import MoleculePreparation
 from meeko import PDBQTWriterLegacy
-from vina import Vina
 
 
 def prepare_ligand(smi):
@@ -37,29 +36,14 @@ def prepare_ligand(smi):
 
     return pdbqt_string
 
-
-def dock_compound(pdbqt_str, coords):
-    v = Vina(sf_name="vina")
-
-    v.set_receptor("data/9GU4-receptor.pdbqt")
-    v.set_ligand_from_string(pdbqt_str)
-    v.compute_vina_maps(center=[coords[0], coords[1], coords[2]], box_size=[20, 20, 20])
-    v.dock(exhaustiveness=8, n_poses=3)
-
-    return v.energies()[0][0]
-
-
+# Base Pipeline
 def get_docking_scores():
     compounds = filter_compounds()
     results = []
-    coords = get_coords()
 
     for smi in compounds:
-        pdbqt = prepare_ligand(smi)
-        if pdbqt is None:
-            continue
         try:
-            score = dock_compound(pdbqt, coords)
+            score = dock_compound(smi)
             results.append((smi, score))
         except Exception as e:
             print(f"Docking failed for {smi}: {e}")
