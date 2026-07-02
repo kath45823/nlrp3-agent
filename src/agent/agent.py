@@ -4,32 +4,28 @@ from src.agent.tools import fetch_compounds, fetch_similar_compounds, dock_compo
 
 tools = [
     {
-        "type": "function", 
+        "type": "function",
         "function": {
             "name": "fetch_compounds",
             "description": (
-                "Fetch an initial pool of drug-like small-molecule compounds from ChEMBL to screen "
-                "against NLRP3. Returns a list of SMILES strings for candidate molecules that pass "
-                "basic drug-likeness filters (Lipinski's rule of five). Call this once at the start "
-                "of a screening campaign to get your initial set of compounds to evaluate."
+                "Fetch an initial pool of drug-like small-molecule compounds to screen against "
+                "NLRP3. Returns a list of SMILES strings for candidate molecules that pass basic "
+                "drug-likeness filters and have been pre-screened for predicted NLRP3 activity. "
+                "Call this once at the start of a screening campaign."
             ),
-            "parameters": {
-                "type": "object",
-                "properties": {},
-                "required": []
-            }
+            "parameters": {"type": "object", "properties": {}, "required": []}
         }
     },
     {
-        "type": "function", 
+        "type": "function",
         "function": {
             "name": "fetch_similar_compounds",
             "description": (
-                "Fetch compounds structurally similar to a given reference compound from ChEMBL "
-                "(70% Tanimoto similarity). Returns a list of SMILES strings. Use this to explore "
-                "chemical space around a promising hit: when a compound docks well, call this with "
-                "that compound's SMILES to find related molecules that may also be strong binders. "
-                "This is how you investigate a promising scaffold in more depth."
+                "Fetch compounds structurally similar to a given reference compound (70% Tanimoto "
+                "similarity), pre-screened for predicted NLRP3 activity. Returns a list of SMILES "
+                "strings. Use this to explore chemical space around a promising hit: when a compound "
+                "docks well, call this with its SMILES to find related molecules that may also be "
+                "strong binders. This is how you investigate a promising scaffold in more depth."
             ),
             "parameters": {
                 "type": "object",
@@ -37,8 +33,8 @@ tools = [
                     "ref_smi": {
                         "type": "string",
                         "description": (
-                            "The SMILES string of the reference compound to find similar molecules to. "
-                            "Typically a compound that has already docked well and is worth exploring around."
+                            "The SMILES string of the reference compound to find similar molecules "
+                            "to. Typically a compound that has already docked well."
                         )
                     }
                 },
@@ -47,7 +43,7 @@ tools = [
         }
     },
     {
-        "type": "function", 
+        "type": "function",
         "function": {
             "name": "dock_compound",
             "description": (
@@ -69,32 +65,52 @@ tools = [
                 "required": ["smi"]
             }
         }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "predict_pic50",
-            "description": (
-                "Cheaply predict the NLRP3 binding activity (pIC50) of a compound from its SMILES "
-                "using a trained model. Fast and inexpensive compared to docking. Higher pIC50 means "
-                "predicted stronger activity; 6.0 or above suggests a promising compound worth docking. "
-                "Use this to pre-screen compounds before spending expensive docking calls on them."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "smi": {
-                        "type": "string", 
-                        "description": "SMILES string of the compound to predict activity for."
-                    }
-                },
-                "required": ["smi"]
-            }
-        }
     }
 ]
 
-SYSTEM_PROMPT = ""
+SYSTEM_PROMPT = """You are a computational drug discovery agent screening for small-molecule inhibitors of NLRP3, an inflammasome protein implicated in gout, Alzheimer's, atherosclerosis, and other inflammatory diseases. Your goal is to identify promising candidate compounds that bind to the NACHT domain's ATP-binding pocket, which locks NLRP3 in its inactive state.
+
+## Your tools
+
+- `fetch_compounds`: retrieves a pool of drug-like candidate compounds, already pre-screened for predicted NLRP3 activity. Call this once at the start.
+- `dock_compound`: docks a single compound (by SMILES) into the NLRP3 NACHT pocket and returns its binding affinity in kcal/mol. This is your primary evaluation tool.
+- `fetch_similar_compounds`: given a reference compound's SMILES, returns structurally similar compounds (also pre-screened for activity). Use this to explore around promising hits.
+
+## Interpreting docking scores
+
+Scores are binding affinities in kcal/mol — more negative means stronger predicted binding:
+- Below -8.0: strong hit, promising
+- -7.0 to -8.0: moderate binder
+- Above -6.0: weak, likely not a real hit
+
+For reference, MCC950 (a known NLRP3 inhibitor) scores around -7.4 in this pocket. A compound scoring better than -7.4 is competitive with a known inhibitor.
+
+## Your workflow
+
+1. Call `fetch_compounds` to get your pre-screened candidate pool.
+2. Dock compounds one at a time with `dock_compound`, working through the pool. Track which score well (below -8.0 kcal/mol) — these are your hits.
+3. When you find a strong hit, consider calling `fetch_similar_compounds` on it to explore that chemical scaffold, then dock those neighbors too. Promising scaffolds are worth investigating in depth.
+4. Continue until you have at least 5 strong hits (below -8.0), OR until you have docked roughly 30 compounds. Do not exhaustively dock the entire pool — stop once you have enough good candidates.
+
+## Decisions you must make
+
+- **When to stop**: after each dock, assess how many strong hits you have. Stop at 5 strong hits or your docking budget. Don't dock indefinitely.
+- **When to explore a scaffold**: if a compound docks notably well, decide whether to fetch and dock its structural neighbors to find even better binders in that series.
+
+## Rules
+
+- Never dock the same compound twice — track what you've already scored.
+- If `dock_compound` reports a failure, skip that compound and move on.
+- Be efficient with docking calls; each one is computationally expensive.
+
+## Final output
+
+When you stop, produce a ranked list of your best candidates (up to 5-10), each with:
+- The SMILES string
+- Its docking score
+- A one-sentence rationale (e.g. "strong binder at -8.6 kcal/mol, better than the MCC950 reference; found by exploring the scaffold of an earlier hit")
+
+Note which hits were found by direct screening versus scaffold exploration. Present the final list clearly as your conclusion."""
 
 client = OpenAI()
 messages = [
@@ -127,9 +143,6 @@ while True:
         elif name == "dock_compound":
             score = dock_compound(args["smi"])
             result = score if score is not None else "docking failed - compound could not be prepared"
-        elif name == "predict_pic50":
-            score = predict_pic50(args["smi"])
-            result = score if score is not None else "pic50 prediction failed - compound could not be predicted"
         
         tool_message = {
             "tool_call_id": call.id, 

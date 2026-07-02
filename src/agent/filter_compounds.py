@@ -1,8 +1,6 @@
 from src.model.chemprop_model import predict_pic50 
-from src.agent.tools import fetch_compounds
 
-def filter_compounds():
-    data = fetch_compounds()
+def filter_compounds(data):
     filtered_compounds = []
     
     for smiles in data: 
