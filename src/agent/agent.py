@@ -1,3 +1,7 @@
+from openai import OpenAI
+import json
+from src.agent.tools import fetch_compounds, fetch_similar_compounds, dock_compound
+
 tools = [
     {
         "type": "function", 
@@ -67,3 +71,44 @@ tools = [
         }
     }
 ]
+
+client = OpenAI()
+messages = [
+    {"role": "system", "content": SYSTEM_PROMPT},
+    {"role": "user", "content": "Find promising NLRP3 inhibitor candidates."}
+]
+
+while True:
+    response = client.chat.completions.create(
+        model = "gpt-4o",
+        messages = messages,
+        tools = tools,
+        tool_choice = "auto"
+    )
+    msg = response.choices[0].message
+    messages.append(msg)
+
+    if msg.tool_calls is None: 
+        print(msg.content)
+        break
+
+    for call in msg.tool_calls:
+        name = call.function.name
+        args = json.loads(call.function.arguments)
+
+        if name == "fetch_compounds":
+            result = fetch_compounds()
+        elif name == "fetch_similar_compounds":
+            result = fetch_similar_compounds(args["ref_smi"])  
+        elif name == "dock_compound":
+            score = dock_compound(args["smi"])
+            result = score if score is not None else "docking failed - compound could not be prepared"
+        
+        tool_message = {
+            "tool_call_id": call.id, 
+            "role": "tool",
+            "name": name,
+            "content": json.dumps(result)
+        }
+
+        messages.append(tool_message)
