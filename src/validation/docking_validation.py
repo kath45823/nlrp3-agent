@@ -1,8 +1,7 @@
 from rdkit import Chem
-from rdkit.Chem import AllChem, rdMolAlign
-from meeko import MoleculePreparation, PDBQTWriterLegacy, PDBQTMolecule, RDKitMolCreate
+from rdkit.Chem import rdMolAlign
+from meeko import PDBQTMolecule, RDKitMolCreate
 from vina import Vina
-import numpy as np
 from src.data_processing.parse_pdb import get_coords
 from src.agent.tools import prepare_ligand
 
