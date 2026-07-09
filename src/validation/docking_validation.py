@@ -33,6 +33,24 @@ def validate_np3253():
     score = v.energies()[0][0]
     print(f"Best docking score: {score:.2f} kcal/mol")
 
+    # RMSD Validation
+    docked_pdbqt = v.poses(n_poses=10)
+    pmol = PDBQTMolecule(docked_pdbqt, is_dlg=False, skip_typing=True)
+    docked_mols = RDKitMolCreate.from_pdbqt_mol(pmol)
+    docked = docked_mols[0]
+    docked = Chem.RemoveHs(docked)
+ 
+    best_rmsd = None
+    for conf_id in range(docked.GetNumConformers()):
+        try:
+            rmsd = rdMolAlign.CalcRMS(docked, np3253, prbId=conf_id)
+        except Exception:
+            rmsd = rdMolAlign.GetBestRMS(docked, np3253)
+        if best_rmsd is None or rmsd < best_rmsd:
+            best_rmsd = rmsd
+ 
+    print(f"Best pose RMSD: {best_rmsd:.2f} A")
+
 
 def validate_mcc950():
     pdbqt_str = prepare_ligand(MCC950_SMILES)
