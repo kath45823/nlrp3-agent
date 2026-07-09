@@ -209,3 +209,9 @@ This project was built with an emphasis on doing the science correctly and being
 - Expanded screening library (scaling from a development-sized pool to a larger production screen).
 - ADMET assessment of top hits (toxicity, metabolic stability, permeability) via pretrained models.
 - Extending the agent to natural-language screening constraints (e.g. "avoid reactive functional groups").
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE)
